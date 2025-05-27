@@ -411,7 +411,7 @@
       // Fetch and render recent bonuses
       async function fetchRecentBonuses() {
         try {
-          const response = await fetch('http://localhost:3000/api/bonuses');
+          const response = await fetch('http://98.80.67.100:3026/api/bonuses');
           if (!response.ok) throw new Error('Failed to fetch bonuses');
           const bonusProposals = await response.json();
           renderRecentBonuses(bonusProposals);
@@ -478,7 +478,7 @@
           return;
         }
         try {
-          const response = await fetch(`http://localhost:3000/api/bonuses/search?employeeID=${employeeID}`);
+          const response = await fetch(`http://98.80.67.100:3026/api/bonuses/search?employeeID=${employeeID}`);
           if (response.status === 200) {
             employeeIDInput.setCustomValidity('This Employee ID has already been submitted');
             employeeIDError.textContent = 'This Employee ID has already been submitted';
@@ -592,7 +592,7 @@
         const reason = reasonInput.value;
 
         try {
-          const response = await fetch('http://localhost:3000/api/bonuses', {
+          const response = await fetch('http://98.80.67.100:3026/api/bonuses', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ employeeName, employeeID, proposalDate, bonusAmount, reason })
