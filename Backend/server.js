@@ -83,8 +83,8 @@ async function initializeDatabase() {
         reason TEXT NOT NULL,
         CONSTRAINT valid_employee_id CHECK (employee_id ~ '^ATS0(?!000)[0-9]{3}$'),
         CONSTRAINT valid_bonus_amount CHECK (bonus_amount >= 100)
-      )
-    `);
+      );
+    `); 
 
     // Insert sample data if table is empty
     const countResult = await pool.query('SELECT COUNT(*) FROM bonus_proposals');
