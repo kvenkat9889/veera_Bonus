@@ -2,7 +2,7 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const app = express();
-const port = 3026;
+const port = 3642;
 
 // Middleware
 app.use(cors());
@@ -83,8 +83,8 @@ async function initializeDatabase() {
         reason TEXT NOT NULL,
         CONSTRAINT valid_employee_id CHECK (employee_id ~ '^ATS0(?!000)[0-9]{3}$'),
         CONSTRAINT valid_bonus_amount CHECK (bonus_amount >= 100)
-      );
-    `); 
+      )
+    `);
 
     // Insert sample data if table is empty
     const countResult = await pool.query('SELECT COUNT(*) FROM bonus_proposals');
@@ -103,6 +103,6 @@ async function initializeDatabase() {
 // Start server
 initializeDatabase().then(() => {
   app.listen(port, () => {
-    console.log(`Server running at http://98.80.67.100:${port}`);
+    console.log(`Server running at http://44.223.23.145:${port}`);
   });
 });

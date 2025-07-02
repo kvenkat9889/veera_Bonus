@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 <title>Employee Bonus View</title>
 <style>
   body {
@@ -195,9 +196,84 @@
       width: 100%;
     }
   }
+  /* Toast Notification Styles */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transform: translateX(calc(100% + 20px));
+  transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.35);
+  z-index: 1000;
+  overflow: hidden;
+  border-left: 4px solid #4CAF50;
+}
+
+.toast.active {
+  transform: translateX(0);
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+}
+
+.toast-content i {
+  font-size: 20px;
+  color: #4CAF50;
+  margin-right: 10px;
+}
+
+.toast .message {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: #ddd;
+}
+
+.progress:before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  height: 100%;
+  width: 100%;
+  background-color: #4CAF50;
+}
+
+.toast.active .progress:before {
+  animation: progress 5s linear forwards;
+}
+
+@keyframes progress {
+  100% {
+    right: 100%;
+  }
+}
 </style>
 </head>
 <body>
+    <div id="toast" class="toast">
+    <div class="toast-content">
+      <i class="fas fa-check-circle"></i>
+      <span class="message">Bonus details found successfully!</span>
+    </div>
+    <div class="progress"></div>
+  </div>
   <header>
     <h1>Bonus Proposals Lookup</h1>
     <p>"Find bonus details by employee name and ID"</p>
@@ -258,60 +334,109 @@
       const idError = document.getElementById('idError');
       
       // Search form submission
-      searchForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        
-        const nameQuery = searchNameInput.value.trim();
-        const idQuery = searchIDInput.value.trim();
-        
-        // Clear previous errors and hide all results
-        nameError.textContent = '';
-        idError.textContent = '';
-        noResults.style.display = 'none';
-        clearResults();
-        
-        // Validate inputs
-        let isValid = true;
-        
-        if (!searchNameInput.validity.valid) {
-          nameError.textContent = 'Please enter a valid name (letters and single spaces only)';
-          isValid = false;
-        }
-        
-        if (!searchIDInput.validity.valid) {
-          idError.textContent = 'Please enter a valid Employee ID (ATS0 followed by 3 digits)';
-          isValid = false;
-        }
-        
-        if (!isValid) return;
-        
-        // Search for bonus proposal
-        try {
-          const response = await fetch(
-            `http://98.80.67.100:3026/api/bonuses/search?employeeName=${encodeURIComponent(nameQuery)}&employeeID=${idQuery}`
-          );
-          
-          if (response.status === 404) {
-            noResults.style.display = 'block';
-            return;
-          }
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch proposal');
-          }
-          
-          const matchedProposal = await response.json();
-          renderBonus(matchedProposal);
-        } catch (error) {
-          console.error('Error searching proposal:', error);
-          noResults.style.display = 'block';
-        }
-      });
+searchForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  
+  const nameQuery = searchNameInput.value.trim();
+  const idQuery = searchIDInput.value.trim();
+  
+  // Clear previous errors and hide all results
+  nameError.textContent = '';
+  idError.textContent = '';
+  noResults.style.display = 'none';
+  clearResults();
+  
+  // Validate inputs
+  let isValid = true;
+  
+  if (!searchNameInput.validity.valid) {
+    nameError.textContent = 'Please enter a valid name (letters and single spaces only)';
+    isValid = false;
+  }
+  
+  if (!searchIDInput.validity.valid) {
+    idError.textContent = 'Please enter a valid Employee ID (ATS0 followed by 3 digits)';
+    isValid = false;
+  }
+  
+  if (!isValid) return;
+  
+  // Hide the form
+  document.querySelector('.search-section').style.display = 'none';
+  
+  // Search for bonus proposal
+  try {
+    const response = await fetch(
+      `http://44.223.23.145:3642/api/bonuses/search?employeeName=${encodeURIComponent(nameQuery)}&employeeID=${idQuery}`
+    );
+    
+    if (response.status === 404) {
+      noResults.style.display = 'block';
+      showToast('No matching bonus proposals found');
+      return;
+    }
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch proposal');
+    }
+    
+    const matchedProposal = await response.json();
+    renderBonus(matchedProposal);
+    showToast('Bonus details found successfully!');
+  } catch (error) {
+    console.error('Error searching proposal:', error);
+    noResults.style.display = 'block';
+    showErrorToast('Error searching for bonus details');
+    
+    // Show the form again if there was an error
+    document.querySelector('.search-section').style.display = 'block';
+  }
+});
       
       // Function to clear all results
       function clearResults() {
         searchResults.innerHTML = '';
       }
+      // Add this function near the top of your script
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  const toastMessage = toast.querySelector('.message');
+  
+  // Update message if provided
+  if (message) {
+    toastMessage.textContent = message;
+  }
+  
+  toast.classList.add('active');
+  
+  setTimeout(() => {
+    toast.classList.remove('active');
+  }, 5000);
+}
+
+// Add this function to show error toast
+function showErrorToast(message) {
+  const toast = document.getElementById('toast');
+  const toastMessage = toast.querySelector('.message');
+  const toastIcon = toast.querySelector('i');
+  const progressBar = toast.querySelector('.progress:before');
+  
+  // Update toast for error state
+  toast.style.borderLeftColor = '#f44336';
+  toastIcon.className = 'fas fa-exclamation-circle';
+  toastIcon.style.color = '#f44336';
+  toastMessage.textContent = message || 'Error occurred while searching';
+  
+  toast.classList.add('active');
+  
+  setTimeout(() => {
+    toast.classList.remove('active');
+    // Reset toast to success style
+    toast.style.borderLeftColor = '#4CAF50';
+    toastIcon.className = 'fas fa-check-circle';
+    toastIcon.style.color = '#4CAF50';
+  }, 5000);
+}
       
       // Function to render a single bonus
       function renderBonus(proposal) {

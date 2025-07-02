@@ -5,14 +5,14 @@ services:
     build: ./Backend
     container_name: bonus-backend
     ports:
-      - "3026:3026"
+      - "3642:3642"
     environment:
       - DB_USER=postgres
       - DB_HOST=postgres
       - DB_NAME=bonus_proposals
       - DB_PASSWORD=admin123
       - DB_PORT=5432
-      - PORT=3026
+      - PORT=3642
     depends_on:
       - postgres
 
@@ -20,13 +20,13 @@ services:
     build: ./Frontend
     container_name: bonus-frontend
     ports:
-      - "9041:80"
+      - "7603:80"
 
   hr:
     build: ./HR
     container_name: bonus-hr  
     ports:
-      - "9042:80"
+      - "7604:80"
 
   postgres:
     image: postgres:15
@@ -39,7 +39,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "5452:5432"
+      - "6641:5432"
 
 volumes:
   pgdata:
