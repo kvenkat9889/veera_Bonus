@@ -323,154 +323,180 @@
     <div id="searchResults"></div>
   </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const searchForm = document.getElementById('searchForm');
-      const searchResults = document.getElementById('searchResults');
-      const noResults = document.getElementById('noResults');
-      const searchNameInput = document.getElementById('searchName');
-      const searchIDInput = document.getElementById('searchID');
-      const nameError = document.getElementById('nameError');
-      const idError = document.getElementById('idError');
-      
-      // Search form submission
-searchForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  
-  const nameQuery = searchNameInput.value.trim();
-  const idQuery = searchIDInput.value.trim();
-  
-  // Clear previous errors and hide all results
-  nameError.textContent = '';
-  idError.textContent = '';
-  noResults.style.display = 'none';
-  clearResults();
-  
-  // Validate inputs
-  let isValid = true;
-  
-  if (!searchNameInput.validity.valid) {
-    nameError.textContent = 'Please enter a valid name (letters and single spaces only)';
-    isValid = false;
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+  const searchForm = document.getElementById('searchForm');
+  const searchResults = document.getElementById('searchResults');
+  const noResults = document.getElementById('noResults');
+  const searchNameInput = document.getElementById('searchName');
+  const searchIDInput = document.getElementById('searchID');
+  const nameError = document.getElementById('nameError');
+  const idError = document.getElementById('idError');
+
+  // Date formatting function (reused from previous code)
+  function formatDate(date) {
+    const options = { day: '2-digit', month: 'short', year: 'numeric' };
+    return new Date(date).toLocaleDateString('en-GB', options).replace(/ /g, '-');
   }
-  
-  if (!searchIDInput.validity.valid) {
-    idError.textContent = 'Please enter a valid Employee ID (ATS0 followed by 3 digits)';
-    isValid = false;
-  }
-  
-  if (!isValid) return;
-  
-  // Hide the form
-  document.querySelector('.search-section').style.display = 'none';
-  
-  // Search for bonus proposal
-  try {
-    const response = await fetch(
-      `http://44.223.23.145:3642/api/bonuses/search?employeeName=${encodeURIComponent(nameQuery)}&employeeID=${idQuery}`
-    );
+
+  // Show toast notification
+  function showToast(message) {
+    const toast = document.getElementById('toast');
+    const toastMessage = toast.querySelector('.message');
     
-    if (response.status === 404) {
+    toastMessage.textContent = message || 'Bonus details found successfully!';
+    toast.classList.add('active');
+    
+    setTimeout(() => {
+      toast.classList.remove('active');
+    }, 5000);
+  }
+
+  // Show error toast
+  function showErrorToast(message) {
+    const toast = document.getElementById('toast');
+    const toastMessage = toast.querySelector('.message');
+    const toastIcon = toast.querySelector('i');
+    
+    toast.style.borderLeftColor = '#f44336';
+    toastIcon.className = 'fas fa-exclamation-circle';
+    toastIcon.style.color = '#f44336';
+    toastMessage.textContent = message || 'Error occurred while searching';
+    
+    toast.classList.add('active');
+    
+    setTimeout(() => {
+      toast.classList.remove('active');
+      // Reset to success style
+      toast.style.borderLeftColor = '#4CAF50';
+      toastIcon.className = 'fas fa-check-circle';
+      toastIcon.style.color = '#4CAF50';
+    }, 5000);
+  }
+
+  // Clear search results
+  function clearResults() {
+    searchResults.innerHTML = '';
+    noResults.style.display = 'none';
+  }
+
+  // Render multiple bonus proposals
+  function renderBonuses(proposals) {
+    clearResults();
+    
+    if (proposals.length === 0) {
       noResults.style.display = 'block';
-      showToast('No matching bonus proposals found');
       return;
     }
+
+    proposals.forEach(proposal => {
+      const resultCard = document.createElement('div');
+      resultCard.className = 'result-card';
+      resultCard.innerHTML = `
+        <div class="result-details">
+          <div class="detail-row">
+            <span class="detail-label">Employee Name</span>
+            <span class="detail-value">${proposal.employee_name}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Employee ID</span>
+            <span class="detail-value">${proposal.employee_id}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Proposal Date</span>
+            <span class="detail-value">${formatDate(proposal.proposal_date)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Bonus Amount</span>
+            <span class="detail-value">₹${Number(proposal.bonus_amount).toLocaleString()}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Reason</span>
+            <span class="detail-value">${proposal.reason}</span>
+          </div>
+        </div>
+      `;
+      searchResults.appendChild(resultCard);
+    });
+  }
+
+  // Search form submission
+  searchForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
     
-    if (!response.ok) {
-      throw new Error('Failed to fetch proposal');
+    const nameQuery = searchNameInput.value.trim();
+    const idQuery = searchIDInput.value.trim();
+    
+    // Clear previous errors and hide results
+    nameError.textContent = '';
+    idError.textContent = '';
+    clearResults();
+    
+    // Validate inputs
+    let isValid = true;
+    
+    if (!searchNameInput.validity.valid) {
+      nameError.textContent = 'Please enter a valid name (letters and single spaces only)';
+      isValid = false;
     }
     
-    const matchedProposal = await response.json();
-    renderBonus(matchedProposal);
-    showToast('Bonus details found successfully!');
-  } catch (error) {
-    console.error('Error searching proposal:', error);
-    noResults.style.display = 'block';
-    showErrorToast('Error searching for bonus details');
+    if (!searchIDInput.validity.valid) {
+      idError.textContent = 'Please enter a valid Employee ID (ATS0 followed by 3 digits)';
+      isValid = false;
+    }
     
-    // Show the form again if there was an error
-    document.querySelector('.search-section').style.display = 'block';
-  }
-});
+    if (!isValid) return;
+    
+    // Hide the form
+    document.querySelector('.search-section').style.display = 'none';
+    
+    // Search for bonus proposals
+    try {
+      const response = await fetch(
+        `http://44.223.23.145:3642/api/bonuses/search?employeeName=${encodeURIComponent(nameQuery)}&employeeID=${idQuery}`
+      );
       
-      // Function to clear all results
-      function clearResults() {
-        searchResults.innerHTML = '';
+      if (response.status === 404) {
+        noResults.style.display = 'block';
+        showToast('No matching bonus proposals found');
+        document.querySelector('.search-section').style.display = 'block';
+        return;
       }
-      // Add this function near the top of your script
-function showToast(message) {
-  const toast = document.getElementById('toast');
-  const toastMessage = toast.querySelector('.message');
-  
-  // Update message if provided
-  if (message) {
-    toastMessage.textContent = message;
-  }
-  
-  toast.classList.add('active');
-  
-  setTimeout(() => {
-    toast.classList.remove('active');
-  }, 5000);
-}
+      
+      if (response.status === 400) {
+        const errorData = await response.json();
+        nameError.textContent = errorData.error;
+        searchNameInput.setCustomValidity(errorData.error);
+        document.querySelector('.search-section').style.display = 'block';
+        showErrorToast(errorData.error);
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch proposals');
+      }
+      
+      const proposals = await response.json();
+      renderBonuses(proposals);
+      showToast(`Found ${proposals.length} bonus proposal${proposals.length === 1 ? '' : 's'}!`);
+    } catch (error) {
+      console.error('Error searching proposals:', error);
+      noResults.style.display = 'block';
+      showErrorToast('Error searching for bonus details');
+      document.querySelector('.search-section').style.display = 'block';
+    }
+  });
 
-// Add this function to show error toast
-function showErrorToast(message) {
-  const toast = document.getElementById('toast');
-  const toastMessage = toast.querySelector('.message');
-  const toastIcon = toast.querySelector('i');
-  const progressBar = toast.querySelector('.progress:before');
-  
-  // Update toast for error state
-  toast.style.borderLeftColor = '#f44336';
-  toastIcon.className = 'fas fa-exclamation-circle';
-  toastIcon.style.color = '#f44336';
-  toastMessage.textContent = message || 'Error occurred while searching';
-  
-  toast.classList.add('active');
-  
-  setTimeout(() => {
-    toast.classList.remove('active');
-    // Reset toast to success style
-    toast.style.borderLeftColor = '#4CAF50';
-    toastIcon.className = 'fas fa-check-circle';
-    toastIcon.style.color = '#4CAF50';
-  }, 5000);
-}
-      
-      // Function to render a single bonus
-      function renderBonus(proposal) {
-        clearResults();
-        
-        const resultCard = document.createElement('div');
-        resultCard.className = 'result-card';
-        resultCard.innerHTML = `
-          <div class="result-details">
-            <div class="detail-row">
-              <span class="detail-label">Employee Name</span>
-              <span class="detail-value">${proposal.employee_name}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Employee ID</span>
-              <span class="detail-value">${proposal.employee_id}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Proposal Date</span>
-              <span class="detail-value">${proposal.proposal_date}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Bonus Amount</span>
-              <span class="detail-value">₹${Number(proposal.bonus_amount).toLocaleString()}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Reason</span>
-              <span class="detail-value">${proposal.reason}</span>
-            </div>
-          </div>
-        `;
-        searchResults.appendChild(resultCard);
-      }
-    });
-  </script>
+  // Reset form and show it again when needed
+  searchForm.addEventListener('reset', () => {
+    clearResults();
+    document.querySelector('.search-section').style.display = 'block';
+    searchNameInput.setCustomValidity('');
+    searchIDInput.setCustomValidity('');
+    nameError.textContent = '';
+    idError.textContent = '';
+  });
+});
+</script>
 </body>
 </html>

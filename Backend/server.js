@@ -27,19 +27,57 @@ app.get('/api/bonuses', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+// Get all bonus proposals by employee ID
+app.get('/api/bonuses/search', async (req, res) => {
+  const { employeeName, employeeID } = req.query;
+  try {
+    const result = await pool.query(
+      'SELECT * FROM bonus_proposals WHERE employee_id = $1 ORDER BY proposal_date DESC',
+      [employeeID]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No matching bonus proposals found' });
+    }
+
+    // Verify employee name consistency across all proposals
+    if (employeeName) {
+      const mismatchedNames = result.rows.filter(
+        row => row.employee_name.toLowerCase() !== employeeName.toLowerCase()
+      );
+      if (mismatchedNames.length > 0) {
+        const existingName = result.rows[0].employee_name; // Use the first name for consistency
+        return res.status(400).json({
+          error: `Employee ID ${employeeID} is associated with ${existingName}. Please use the correct employee name.`,
+        });
+      }
+    }
+
+    res.json(result.rows); // Return all matching proposals
+  } catch (err) {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // Get bonus proposal by name and ID
 app.get('/api/bonuses/search', async (req, res) => {
   const { employeeName, employeeID } = req.query;
   try {
     const result = await pool.query(
-      'SELECT * FROM bonus_proposals WHERE LOWER(employee_name) = LOWER($1) AND employee_id = $2',
-      [employeeName, employeeID]
+      'SELECT * FROM bonus_proposals WHERE employee_id = $1',
+      [employeeID]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'No matching bonus proposals found' });
     }
-    res.json(result.rows[0]);
+    const proposal = result.rows[0];
+    if (employeeName && proposal.employee_name.toLowerCase() !== employeeName.toLowerCase()) {
+      return res.status(400).json({
+        error: `Employee ID ${employeeID} is associated with ${proposal.employee_name}. Please use the correct employee name.`,
+      });
+    }
+    res.json(proposal);
   } catch (err) {
     console.error(err.stack);
     res.status(500).json({ error: 'Server error' });
@@ -47,16 +85,36 @@ app.get('/api/bonuses/search', async (req, res) => {
 });
 
 // Create a new bonus proposal
+// Create a new bonus proposal
 app.post('/api/bonuses', async (req, res) => {
   const { employeeName, employeeID, proposalDate, bonusAmount, reason } = req.body;
   try {
-    // Check for duplicate employee ID
-    const checkResult = await pool.query(
-      'SELECT 1 FROM bonus_proposals WHERE employee_id = $1',
+    // Check for existing proposal in the same month
+    const checkMonthResult = await pool.query(
+      `SELECT proposal_date, employee_name FROM bonus_proposals 
+       WHERE employee_id = $1 
+       AND EXTRACT(MONTH FROM proposal_date) = EXTRACT(MONTH FROM $2::date)
+       AND EXTRACT(YEAR FROM proposal_date) = EXTRACT(YEAR FROM $2::date)`,
+      [employeeID, proposalDate]
+    );
+
+    if (checkMonthResult.rows.length > 0) {
+      return res.status(400).json({ error: 'Employee ID has already been submitted for this month' });
+    }
+
+    // Check if employee ID exists and verify employee name consistency
+    const checkNameResult = await pool.query(
+      'SELECT employee_name FROM bonus_proposals WHERE employee_id = $1 LIMIT 1',
       [employeeID]
     );
-    if (checkResult.rows.length > 0) {
-      return res.status(400).json({ error: 'Employee ID has already been submitted' });
+
+    if (checkNameResult.rows.length > 0) {
+      const existingName = checkNameResult.rows[0].employee_name;
+      if (existingName.toLowerCase() !== employeeName.toLowerCase()) {
+        return res.status(400).json({
+          error: `Employee ID ${employeeID} is associated with ${existingName}. Please use the same employee name.`,
+        });
+      }
     }
 
     const result = await pool.query(
@@ -66,24 +124,36 @@ app.post('/api/bonuses', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err.stack);
+    if (err.code === '23505') { // PostgreSQL unique violation error code
+      return res.status(400).json({ error: 'Employee ID has already been submitted for this month' });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Initialize database with sample data
 async function initializeDatabase() {
   try {
+    // Drop the existing table to clear any previous constraints (optional, only if needed)
+    await pool.query('DROP TABLE IF EXISTS bonus_proposals CASCADE');
+
+    // Create the table without the problematic UNIQUE constraint
     await pool.query(`
       CREATE TABLE IF NOT EXISTS bonus_proposals (
         id SERIAL PRIMARY KEY,
         employee_name VARCHAR(100) NOT NULL,
-        employee_id VARCHAR(7) NOT NULL UNIQUE,
+        employee_id VARCHAR(7) NOT NULL,
         proposal_date DATE NOT NULL,
         bonus_amount INTEGER NOT NULL,
         reason TEXT NOT NULL,
         CONSTRAINT valid_employee_id CHECK (employee_id ~ '^ATS0(?!000)[0-9]{3}$'),
         CONSTRAINT valid_bonus_amount CHECK (bonus_amount >= 100)
       )
+    `);
+
+    // Create a unique index to enforce one bonus per employee per month
+    await pool.query(`
+      CREATE UNIQUE INDEX unique_employee_per_month 
+      ON bonus_proposals (employee_id, EXTRACT(YEAR FROM proposal_date), EXTRACT(MONTH FROM proposal_date))
     `);
 
     // Insert sample data if table is empty
@@ -97,6 +167,7 @@ async function initializeDatabase() {
     }
   } catch (err) {
     console.error('Error initializing database:', err.stack);
+    throw err; // Stop the server if database initialization fails
   }
 }
 
